@@ -1,0 +1,14 @@
+{
+  "path": {
+    "name": "File Path",
+    "name_zh": "文件路径",
+    "description": "File Path",
+    "description_zh": "文件路径",
+    "attribute": "required",
+    "type": "string",
+    "default": "/data",
+    "valid": {
+      "length": 255
+    }
+  }
+}
