@@ -107,6 +107,7 @@ static int driver_stop(neu_plugin_t *plugin)
     plugin->started = false;
     if (plugin->fp != NULL) {
         fclose(plugin->fp);
+        plugin->fp = NULL;
     }
     return 0;
 }
@@ -119,6 +120,7 @@ static int driver_uninit(neu_plugin_t *plugin)
 
     if (plugin->fp != NULL) {
         fclose(plugin->fp);
+        plugin->fp = NULL;
     }
     return NEU_ERR_SUCCESS;
 }
