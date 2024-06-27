@@ -73,9 +73,16 @@ static int driver_config(neu_plugin_t *plugin, const char *setting)
     char *err_param = NULL;
 
     neu_json_elem_t path = { .name = "path", .t = NEU_JSON_STR, .v.val_str = NULL };
-
-    ret = neu_parse_param((char *) setting, &err_param, 1, &path);
-
+    neu_json_elem_t precision = { .name = "precision", .t = NEU_JSON_INT};
+    neu_json_elem_t with_timestamp = { .name = "with_timestamp", .t = NEU_JSON_BOOL};
+    neu_json_elem_t max_file_size = { .name = "max_file_size", .t = NEU_JSON_INT};
+    ret = neu_parse_param((char *) setting, &err_param, 4, &path,&precision,&with_timestamp,&max_file_size);
+    plugin->precision=1;
+    for(int i=0;i<(int)precision.v.val_int;i++){
+        plugin->precision = plugin->precision*10;
+    }
+    plugin->with_timestamp = with_timestamp.v.val_bool;
+    plugin->max_file_size = max_file_size.v.val_int*1024*1024;
     strcpy(plugin->path, path.v.val_str);
     plog_notice(plugin, "config: path: %s", plugin->path);
     return 0;

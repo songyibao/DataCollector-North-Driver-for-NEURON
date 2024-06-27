@@ -10,5 +10,41 @@
     "valid": {
       "length": 255
     }
+  },
+  "precision": {
+    "name": "Decimal places",
+    "name_zh": "小数点保留位数",
+    "description": "Decimal places",
+    "description_zh": "小数点保留位数",
+    "attribute": "required",
+    "type": "int",
+    "default": 2,
+    "valid": {
+      "min": 1,
+      "max": 6
+    }
+  },
+  "with_timestamp": {
+    "name": "Add Timestamp",
+    "name_zh": "添加时间戳",
+    "description": "Add Timestamp",
+    "description_zh": "是否要给每条记录后面添加时间戳",
+    "attribute": "required",
+    "type": "bool",
+    "default": true,
+    "valid": {}
+  },
+  "max_file_size": {
+    "name": "Max File Size, MB",
+    "name_zh": "最大文件大小,单位:MB",
+    "description": "Max File Size",
+    "description_zh": "单个文件的最大大小",
+    "attribute": "required",
+    "type": "int",
+    "default": 1,
+    "valid": {
+      "min": 1,
+      "max": 100
+    }
   }
 }

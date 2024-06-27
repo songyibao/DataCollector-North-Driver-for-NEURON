@@ -57,25 +57,31 @@ int transform(neu_plugin_t *plugin, char *input_json_str, char **output_json_str
 
         json_t *tags_array = json_object_get(input_root, "tags");
         size_t  tags_size  = json_array_size(tags_array);
-        // 0为heart 1为start_flag
-        for (index = 2; index < tags_size && (value = json_array_get(tags_array, index)); index++) {
+        // 特殊需求时i从2开始，0为heart 1为start_flag
+        for (index = 0; index < tags_size && (value = json_array_get(tags_array, index)); index++) {
             json_t *real_value = json_object_get(value, "value");
-            // 小数保留两位
-            json_real_set(real_value, (round(json_real_value(real_value) * 1000000)) / 1000000);
+
+            // 根据plugin->precision来判断保留几位小数,plugin->precision=100时，保留两位小数
+            json_real_set(real_value, (round(json_real_value(real_value) * plugin->precision)) / plugin->precision);
 
             if (json_is_real(real_value) || json_is_integer(real_value)) {
                 json_array_append_new(res_arr, real_value);
             }
         }
-        for (int i = 0; i < 7; i++) {
-            json_t *real_value = json_real(0);
-            json_array_append_new(res_arr, real_value);
-        }
-        json_t *integer_value = json_integer(neu_time_ms());
+        // 预留位补零，特殊需求
+//        for (int i = 0; i < 7; i++) {
+//            json_t *real_value = json_real(0);
+//            json_array_append_new(res_arr, real_value);
+//        }
+        if(plugin->with_timestamp){
+            // 配置需要时间戳
+            json_t *integer_value = json_integer(neu_time_ms());
 
-        if (json_is_integer(integer_value)) {
-            json_array_append_new(res_arr, integer_value);
+            if (json_is_integer(integer_value)) {
+                json_array_append_new(res_arr, integer_value);
+            }
         }
+
     }
 
     char *tmp = json_dumps(res_arr, JSON_INDENT(0) | JSON_PRESERVE_ORDER);

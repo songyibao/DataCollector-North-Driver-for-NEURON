@@ -8,6 +8,13 @@
 struct neu_plugin {
     neu_plugin_common_t common;
 
+    // 可选参数
+    // 小数保留位数
+    int precision;
+    // 每条记录是否添加时间戳
+    bool with_timestamp;
+    // 最大文件大小,单位MB
+    uint64_t max_file_size;
     // 文件路径
     char path[255];
     // 文件指针
