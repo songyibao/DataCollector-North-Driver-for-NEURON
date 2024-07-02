@@ -8,8 +8,8 @@
 #include "jansson.h"
 #include "math.h"
 #include "json/neu_json_rw.h"
-void remove_chars(char *str)
-{
+
+void remove_chars(char *str) {
     int len = strlen(str);
     int i, j = 0;
 
@@ -36,9 +36,9 @@ void remove_chars(char *str)
     }
     str[j] = '\0';
 }
-int transform(neu_plugin_t *plugin, char *input_json_str, char **output_json_str)
-{
-    json_t      *input_root, *res_arr;
+
+int transform(neu_plugin_t *plugin, char *input_json_str, char **output_json_str) {
+    json_t *input_root, *res_arr;
     json_error_t error;
 
     // 解析输入JSON字符串
@@ -52,11 +52,11 @@ int transform(neu_plugin_t *plugin, char *input_json_str, char **output_json_str
     // 提取并重组数据
     res_arr = json_array();
     if (json_is_array(json_object_get(input_root, "tags"))) {
-        size_t  index;
+        size_t index;
         json_t *value;
 
         json_t *tags_array = json_object_get(input_root, "tags");
-        size_t  tags_size  = json_array_size(tags_array);
+        size_t tags_size = json_array_size(tags_array);
         // 特殊需求时i从2开始，0为heart 1为start_flag
         for (index = 0; index < tags_size && (value = json_array_get(tags_array, index)); index++) {
             json_t *real_value = json_object_get(value, "value");
@@ -73,7 +73,7 @@ int transform(neu_plugin_t *plugin, char *input_json_str, char **output_json_str
 //            json_t *real_value = json_real(0);
 //            json_array_append_new(res_arr, real_value);
 //        }
-        if(plugin->with_timestamp){
+        if (plugin->with_timestamp) {
             // 配置需要时间戳
             json_t *integer_value = json_integer(neu_time_ms());
 
@@ -94,13 +94,13 @@ int transform(neu_plugin_t *plugin, char *input_json_str, char **output_json_str
 
     return 0;
 }
+
 int handle_trans_data(neu_plugin_t *plugin, neu_reqresp_head_t *head,
-                      neu_reqresp_trans_data_t *trans_data)
-{
-    int                  ret             = 0;
-    char                *json_str        = NULL;
-    char                *transformed_str = NULL;
-    neu_json_read_resp_t resp            = { 0 };
+                      neu_reqresp_trans_data_t *trans_data) {
+    int ret = 0;
+    char *json_str = NULL;
+    char *transformed_str = NULL;
+    neu_json_read_resp_t resp = {0};
 
     tag_ut_array_to_neu_json_read_resp_t(trans_data->tags, &resp);
     for (int i = 0; i < resp.n_tag; i++) {
@@ -115,7 +115,21 @@ int handle_trans_data(neu_plugin_t *plugin, neu_reqresp_head_t *head,
         return -1;
     }
     //    plog_debug(plugin, "parse json str succeed: %s", json_str);
+    if (plugin->need_deduplication == true) {
+        if (plugin->pre_str != NULL) {
+            if (strcmp(plugin->pre_str, json_str) == 0) {
+                plog_notice(plugin, "deduplication");
+                // 与上一条数据相同，不处理
+                return 0;
+            } else {
+                free(plugin->pre_str);
+                plugin->pre_str = strdup(json_str);
+            }
+        } else {
+            plugin->pre_str = strdup(json_str);
+        }
 
+    }
     int res = transform(plugin, json_str, &transformed_str);
     free(json_str);
     if (res != 0) {

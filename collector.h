@@ -9,6 +9,9 @@ struct neu_plugin {
     neu_plugin_common_t common;
 
     // 可选参数
+    // 上一条数据，用于去重
+    char *pre_str;
+    bool need_deduplication;
     // 小数保留位数
     int precision;
     // 每条记录是否添加时间戳

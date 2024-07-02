@@ -3,38 +3,38 @@
 //
 #include "collector.h"
 #include "service/service.h"
+
 #define DESCRIPTION "Plugin responsible for data collection and storage"
 #define DESCRIPTION_ZH "负责数据采集和存储的插件"
 static const neu_plugin_intf_funs_t plugin_intf_funs = {
-    .open    = driver_open,
-    .close   = driver_close,
-    .init    = driver_init,
-    .uninit  = driver_uninit,
-    .start   = driver_start,
-    .stop    = driver_stop,
-    .setting = driver_config,
-    .request = driver_request,
+        .open    = driver_open,
+        .close   = driver_close,
+        .init    = driver_init,
+        .uninit  = driver_uninit,
+        .start   = driver_start,
+        .stop    = driver_stop,
+        .setting = driver_config,
+        .request = driver_request,
 
-    .driver.validate_tag = driver_validate_tag,
-    .driver.group_timer  = driver_group_timer,
-    .driver.write_tag    = driver_write,
+        .driver.validate_tag = driver_validate_tag,
+        .driver.group_timer  = driver_group_timer,
+        .driver.write_tag    = driver_write,
 };
 
 const neu_plugin_module_t neu_plugin_module = {
-    .version         = NEURON_PLUGIN_VER_1_0,
-    .schema          = "collector",
-    .module_name     = "Data Collector",
-    .module_descr    = DESCRIPTION,
-    .module_descr_zh = DESCRIPTION_ZH,
-    .intf_funs       = &plugin_intf_funs,
-    .kind            = NEU_PLUGIN_KIND_SYSTEM,
-    .type            = NEU_NA_TYPE_APP,
-    .display         = true,
-    .single          = false,
+        .version         = NEURON_PLUGIN_VER_1_0,
+        .schema          = "collector",
+        .module_name     = "Data Collector",
+        .module_descr    = DESCRIPTION,
+        .module_descr_zh = DESCRIPTION_ZH,
+        .intf_funs       = &plugin_intf_funs,
+        .kind            = NEU_PLUGIN_KIND_SYSTEM,
+        .type            = NEU_NA_TYPE_APP,
+        .display         = true,
+        .single          = false,
 };
 
-static neu_plugin_t *driver_open(void)
-{
+static neu_plugin_t *driver_open(void) {
 
     neu_plugin_t *plugin = calloc(1, sizeof(neu_plugin_t));
 
@@ -44,56 +44,65 @@ static neu_plugin_t *driver_open(void)
     return plugin;
 }
 
-static int driver_close(neu_plugin_t *plugin)
-{
+static int driver_close(neu_plugin_t *plugin) {
     free(plugin);
 
     return 0;
 }
+
 // driver_init -> driver_config -> driver_start
-static int driver_init(neu_plugin_t *plugin, bool load)
-{
+static int driver_init(neu_plugin_t *plugin, bool load) {
     (void) load;
     plog_notice(plugin,
                 "============================================================"
                 "\ninitialize "
                 "plugin============================================================\n");
     plugin->common.link_state = NEU_NODE_LINK_STATE_CONNECTED;
-    plugin->started           = false;
-    plugin->fp                = NULL;
+    plugin->started = false;
+    plugin->fp = NULL;
+    plugin->pre_str = NULL;
     return 0;
 }
 
-static int driver_config(neu_plugin_t *plugin, const char *setting)
-{
+static int driver_config(neu_plugin_t *plugin, const char *setting) {
     plog_notice(plugin,
                 "============================================================\nconfig "
                 "plugin============================================================\n");
-    int   ret       = 0;
+    int ret = 0;
     char *err_param = NULL;
 
-    neu_json_elem_t path = { .name = "path", .t = NEU_JSON_STR, .v.val_str = NULL };
-    neu_json_elem_t precision = { .name = "precision", .t = NEU_JSON_INT};
-    neu_json_elem_t with_timestamp = { .name = "with_timestamp", .t = NEU_JSON_BOOL};
-    neu_json_elem_t max_file_size = { .name = "max_file_size", .t = NEU_JSON_INT};
-    ret = neu_parse_param((char *) setting, &err_param, 4, &path,&precision,&with_timestamp,&max_file_size);
-    plugin->precision=1;
-    for(int i=0;i<(int)precision.v.val_int;i++){
-        plugin->precision = plugin->precision*10;
+    neu_json_elem_t path = {.name = "path", .t = NEU_JSON_STR, .v.val_str = NULL};
+    neu_json_elem_t precision = {.name = "precision", .t = NEU_JSON_INT};
+    neu_json_elem_t with_timestamp = {.name = "with_timestamp", .t = NEU_JSON_BOOL};
+    neu_json_elem_t deduplication = {.name = "deduplication", .t = NEU_JSON_BOOL};
+    neu_json_elem_t max_file_size = {.name = "max_file_size", .t = NEU_JSON_INT};
+    ret = neu_parse_param((char *) setting, &err_param, 5, &path, &precision, &with_timestamp, &deduplication,
+                          &max_file_size);
+    plugin->precision = 1;
+    for (int i = 0; i < (int) precision.v.val_int; i++) {
+        plugin->precision = plugin->precision * 10;
     }
     plugin->with_timestamp = with_timestamp.v.val_bool;
-    plugin->max_file_size = max_file_size.v.val_int*1024*1024;
+    plugin->need_deduplication = deduplication.v.val_bool;
+    if (plugin->need_deduplication == false && plugin->pre_str != NULL) {
+        free(plugin->pre_str);
+        plugin->pre_str = NULL;
+    }
+    plugin->max_file_size = max_file_size.v.val_int * 1024 * 1024;
     strcpy(plugin->path, path.v.val_str);
     plog_notice(plugin, "config: path: %s", plugin->path);
     return 0;
 }
 
-static int driver_start(neu_plugin_t *plugin)
-{
+static int driver_start(neu_plugin_t *plugin) {
     plog_notice(plugin,
                 "============================================================\nstart "
                 "plugin============================================================\n");
     plugin->started = true;
+    if (plugin->pre_str != NULL) {
+        free(plugin->pre_str);
+        plugin->pre_str = NULL;
+    }
     // plugin->path/data_时间戳.csv 作为文件名
     char filename[290];
     long timestamp = neu_time_ms();
@@ -105,9 +114,7 @@ static int driver_start(neu_plugin_t *plugin)
     return 0;
 }
 
-static int driver_stop(neu_plugin_t *plugin)
-{
-
+static int driver_stop(neu_plugin_t *plugin) {
     plog_notice(plugin,
                 "============================================================\nstop "
                 "plugin============================================================\n");
@@ -116,11 +123,14 @@ static int driver_stop(neu_plugin_t *plugin)
         fclose(plugin->fp);
         plugin->fp = NULL;
     }
+    if (plugin->pre_str != NULL) {
+        free(plugin->pre_str);
+        plugin->pre_str = NULL;
+    }
     return 0;
 }
 
-static int driver_uninit(neu_plugin_t *plugin)
-{
+static int driver_uninit(neu_plugin_t *plugin) {
     plog_notice(plugin,
                 "============================================================\nuninit "
                 "plugin============================================================\n");
@@ -132,8 +142,7 @@ static int driver_uninit(neu_plugin_t *plugin)
     return NEU_ERR_SUCCESS;
 }
 
-static int driver_request(neu_plugin_t *plugin, neu_reqresp_head_t *head, void *data)
-{
+static int driver_request(neu_plugin_t *plugin, neu_reqresp_head_t *head, void *data) {
     plog_notice(plugin,
                 "============================================================request "
                 "plugin============================================================\n");
@@ -141,32 +150,29 @@ static int driver_request(neu_plugin_t *plugin, neu_reqresp_head_t *head, void *
         return 0;
     }
     switch (head->type) {
-    case NEU_REQRESP_TRANS_DATA:
-        handle_trans_data(plugin, head, data);
-        break;
-    default:
-        break;
+        case NEU_REQRESP_TRANS_DATA:
+            handle_trans_data(plugin, head, data);
+            break;
+        default:
+            break;
     }
     return 0;
 }
 
-static int driver_validate_tag(neu_plugin_t *plugin, neu_datatag_t *tag)
-{
+static int driver_validate_tag(neu_plugin_t *plugin, neu_datatag_t *tag) {
     plog_notice(plugin, "validate tag: %s", tag->name);
 
     return 0;
 }
 
-static int driver_group_timer(neu_plugin_t *plugin, neu_plugin_group_t *group)
-{
+static int driver_group_timer(neu_plugin_t *plugin, neu_plugin_group_t *group) {
     (void) plugin;
     (void) group;
 
     return 0;
 }
 
-static int driver_write(neu_plugin_t *plugin, void *req, neu_datatag_t *tag, neu_value_u value)
-{
+static int driver_write(neu_plugin_t *plugin, void *req, neu_datatag_t *tag, neu_value_u value) {
     (void) plugin;
     (void) req;
     (void) tag;
