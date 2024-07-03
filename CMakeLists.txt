@@ -9,6 +9,7 @@ add_library(plugin-collector SHARED collector.c
         service/service.c
         utils/utils.c
         file_writer/writer.c
+        http_client/update_interval.c
 )
 
 target_include_directories(plugin-collector PRIVATE
@@ -16,4 +17,4 @@ target_include_directories(plugin-collector PRIVATE
 )
 
 target_link_libraries(plugin-collector PRIVATE z ev)
-target_link_libraries(plugin-collector PRIVATE /usr/local/lib/neuron/libneuron-base.so)
+target_link_libraries(plugin-collector PRIVATE /usr/local/lib/neuron/libneuron-base.so curl /usr/local/lib/libyyjson.so)

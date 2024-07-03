@@ -4,10 +4,11 @@
 #include "service.h"
 
 #include "../file_writer/writer.h"
+#include "../http_client/update_interval.h"
 #include "../utils/utils.h"
 #include "jansson.h"
-#include "math.h"
 #include "json/neu_json_rw.h"
+#include "math.h"
 
 void remove_chars(char *str) {
     int len = strlen(str);
@@ -62,17 +63,18 @@ int transform(neu_plugin_t *plugin, char *input_json_str, char **output_json_str
             json_t *real_value = json_object_get(value, "value");
 
             // 根据plugin->precision来判断保留几位小数,plugin->precision=100时，保留两位小数
-            json_real_set(real_value, (round(json_real_value(real_value) * plugin->precision)) / plugin->precision);
+            json_real_set(real_value, (round(json_real_value(real_value) * plugin->precision)) /
+                                          plugin->precision);
 
             if (json_is_real(real_value) || json_is_integer(real_value)) {
                 json_array_append_new(res_arr, real_value);
             }
         }
         // 预留位补零，特殊需求
-//        for (int i = 0; i < 7; i++) {
-//            json_t *real_value = json_real(0);
-//            json_array_append_new(res_arr, real_value);
-//        }
+        //        for (int i = 0; i < 7; i++) {
+        //            json_t *real_value = json_real(0);
+        //            json_array_append_new(res_arr, real_value);
+        //        }
         if (plugin->with_timestamp) {
             // 配置需要时间戳
             json_t *integer_value = json_integer(neu_time_ms());
@@ -81,7 +83,6 @@ int transform(neu_plugin_t *plugin, char *input_json_str, char **output_json_str
                 json_array_append_new(res_arr, integer_value);
             }
         }
-
     }
 
     char *tmp = json_dumps(res_arr, JSON_INDENT(0) | JSON_PRESERVE_ORDER);
@@ -115,21 +116,33 @@ int handle_trans_data(neu_plugin_t *plugin, neu_reqresp_head_t *head,
         return -1;
     }
     //    plog_debug(plugin, "parse json str succeed: %s", json_str);
-    if (plugin->need_deduplication == true) {
-        if (plugin->pre_str != NULL) {
-            if (strcmp(plugin->pre_str, json_str) == 0) {
-                plog_notice(plugin, "deduplication");
-                // 与上一条数据相同，不处理
+    if (plugin->pre_str != NULL) {
+        if (strcmp(plugin->pre_str, json_str) == 0) {
+            if (plugin->need_dynamic_interval == true) {
+                plog_debug(plugin, "数据重复,需要增大采集间隔");
+                // 如果成功，函数内部会更新plugin->node_group_interval的值
+                update_interval(plugin->node_name, plugin->group_name,
+                                plugin->node_group_interval + 1, plugin);
+            }
+            if (plugin->need_deduplication == true) {
+                plog_debug(plugin, "数据重复,需要去重,不记录");
+                // 与上一条数据相同，需要去重，不处理
                 return 0;
-            } else {
-                free(plugin->pre_str);
-                plugin->pre_str = strdup(json_str);
             }
         } else {
+            if (plugin->need_dynamic_interval == true) {
+                plog_debug(plugin, "数据不重复,需要减小采集间隔");
+                // 如果成功，函数内部会更新plugin->node_group_interval的值
+                update_interval(plugin->node_name, plugin->group_name,
+                                plugin->node_group_interval - 5, plugin);
+            }
+            free(plugin->pre_str);
             plugin->pre_str = strdup(json_str);
         }
-
+    } else {
+        plugin->pre_str = strdup(json_str);
     }
+
     int res = transform(plugin, json_str, &transformed_str);
     free(json_str);
     if (res != 0) {

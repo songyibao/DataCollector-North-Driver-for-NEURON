@@ -56,5 +56,15 @@
     "type": "bool",
     "default": true,
     "valid": {}
+  },
+  "dynamic_interval": {
+    "name": "Is Dynamic Interval Required",
+    "name_zh": "是否启用动态采集间隔",
+    "description": "Is Dynamic Interval Required",
+    "description_zh": "开启后，会动态调整采集间隔",
+    "attribute": "required",
+    "type": "bool",
+    "default": true,
+    "valid": {}
   }
 }
